@@ -73,3 +73,5 @@ compile_commands.json
 *creator.user*
 
 *_qmlcache.qrc
+
+.qmake.stash
