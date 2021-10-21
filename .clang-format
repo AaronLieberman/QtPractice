@@ -18,6 +18,7 @@ ConstructorInitializerIndentWidth: 4
 IndentWidth: 4
 IndentCaseLabels: true
 PointerAlignment: Left
+AlwaysBreakTemplateDeclarations: Yes
 
 SortIncludes: true
 IncludeCategories:
