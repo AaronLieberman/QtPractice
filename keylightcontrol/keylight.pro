@@ -10,4 +10,4 @@ HEADERS += KeyLightControlWindow.h
 SOURCES += main.cpp KeyLightControlWindow.cpp
 
 # Add widgets (e.g. text)
-QT += widgets
+QT += widgets network
