@@ -15,8 +15,9 @@
 
 #include "KeyLightControlWindow.h"
 
+namespace {
 template <typename TParent, typename TLayout>
-static TParent* applyLayout(TParent* parent, std::initializer_list<QWidget*> widgets) {
+TParent* applyLayout(TParent* parent, std::initializer_list<QWidget*> widgets) {
 	QLayout* layout = new TLayout();
 
 	for (QWidget* widget : widgets) {
@@ -28,14 +29,16 @@ static TParent* applyLayout(TParent* parent, std::initializer_list<QWidget*> wid
 }
 
 template <typename TParent, typename TLayout>
-static TParent* applyLayout(std::initializer_list<QWidget*> widgets) {
+TParent* applyLayout(std::initializer_list<QWidget*> widgets) {
 	return applyLayout<TParent, TLayout>(new TParent(), std::move(widgets));
 }
+} // namespace
 
 KeyLightControlWindow::KeyLightControlWindow()
     : _networkManager(std::make_unique<QNetworkAccessManager>()) {
-	QLabel* statusLabel = new QLabel("Status");
-	QFrame* statusFrame = applyLayout<QFrame, QVBoxLayout>({statusLabel});
+	QLabel* statusLabel = new QLabel("LightStatus");
+	_statusFrame = applyLayout<QFrame, QVBoxLayout>({});
+	QFrame* statusGroupFrame = applyLayout<QFrame, QVBoxLayout>({statusLabel, _statusFrame});
 
 	QPushButton* onButton = new QPushButton("&On");
 	QObject::connect(onButton, SIGNAL(clicked()), this, SLOT(turnOn()));
@@ -44,7 +47,7 @@ KeyLightControlWindow::KeyLightControlWindow()
 
 	QFrame* buttonFrame = applyLayout<QFrame, QHBoxLayout>({onButton, offButton});
 
-	applyLayout<QWidget, QVBoxLayout>(this, {statusFrame, buttonFrame});
+	applyLayout<QWidget, QVBoxLayout>(this, {statusGroupFrame, buttonFrame});
 
 	QTimer* timer = new QTimer(this);
 	connect(timer, SIGNAL(timeout()), this, SLOT(getStatus()));
@@ -73,6 +76,34 @@ void KeyLightControlWindow::getStatus() {
 	}
 }
 
+std::vector<KeyLightControlWindow::LightStatus> KeyLightControlWindow::parseStatus(const QString& jsonStatusText) {
+	// example:
+	// {
+	// 	"numberOfLights":1,
+	// 	"lights": [
+	// 		{
+	// 			"on":0,
+	// 			"brightness":5,
+	// 			"temperature":273
+	// 		}
+	// 	]
+	// }
+
+	QJsonDocument d = QJsonDocument::fromJson(jsonStatusText.toUtf8());
+	QJsonObject root = d.object();
+
+	std::vector<KeyLightControlWindow::LightStatus> lightStatus;
+
+	QJsonArray lights = root.value(QString("lights")).toArray();
+	for (QJsonValueRef lightValue : lights) {
+		QJsonObject light = lightValue.toObject();
+		lightStatus.push_back(LightStatus{
+		    light["on"].toInt() == 0 ? false : true, light["brightness"].toInt(), light["temperature"].toInt()});
+	};
+
+	return lightStatus;
+}
+
 void KeyLightControlWindow::getStatusFinished(QNetworkReply* reply) {
 	if (reply == _statusReply) {
 		reply->deleteLater();
@@ -82,9 +113,16 @@ void KeyLightControlWindow::getStatusFinished(QNetworkReply* reply) {
 			return;
 		}
 
-		QString answer = reply->readAll();
+		QString jsonStatusText = reply->readAll();
 
-		qDebug() << "Status: " << answer;
+		qDebug() << "LightStatus: " << jsonStatusText;
+		auto lightStatus = parseStatus(jsonStatusText);
+		updateStatusUI(lightStatus);
+
 		_statusReply = nullptr;
 	}
+}
+
+void KeyLightControlWindow::updateStatusUI(std::vector<LightStatus> lightStatus) {
+	//_statusFrame
 }
