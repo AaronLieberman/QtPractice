@@ -19,6 +19,7 @@ IndentWidth: 4
 IndentCaseLabels: true
 PointerAlignment: Left
 AlwaysBreakTemplateDeclarations: Yes
+BreakConstructorInitializers: BeforeComma
 
 SortIncludes: true
 IncludeCategories:
