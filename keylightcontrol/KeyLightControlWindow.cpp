@@ -18,6 +18,7 @@
 #include "KeyLightControlWindow.h"
 
 namespace {
+
 template <typename TParent, typename TLayout>
 TParent* applyLayout(TParent* parent, std::initializer_list<QWidget*> widgets) {
 	QLayout* layout = new TLayout();
@@ -46,6 +47,7 @@ std::string replace(const std::string& str, const std::string& from, const std::
 	result.replace(start_pos, from.length(), to);
 	return result;
 }
+
 } // namespace
 
 KeyLightControlWindow::KeyLightControlWindow(std::string hostName, std::string port)
@@ -58,9 +60,9 @@ KeyLightControlWindow::KeyLightControlWindow(std::string hostName, std::string p
 
 	applyLayout<QWidget, QVBoxLayout>(this, {statusGroupFrame});
 
-	QTimer* timer = new QTimer(this);
-	connect(timer, SIGNAL(timeout()), this, SLOT(getStatus()));
-	timer->start(1000);
+	_timer = new QTimer(this);
+	connect(_timer, SIGNAL(timeout()), this, SLOT(getStatus()));
+	_timer->start(1000);
 
 	QObject::connect(_networkManager.get(), &QNetworkAccessManager::finished, this,
 	    [this](QNetworkReply* reply) { getStatusFinished(reply); });
@@ -94,11 +96,10 @@ std::vector<KeyLightControlWindow::LightStatus> KeyLightControlWindow::parseStat
 	std::vector<KeyLightControlWindow::LightStatus> lightStatus;
 
 	QJsonArray lights = root.value(QString("lights")).toArray();
-	int lightIndex = 0;
 	for (QJsonValueRef lightValue : lights) {
 		QJsonObject light = lightValue.toObject();
-		lightStatus.push_back(LightStatus{lightIndex++, light["on"].toInt() == 0 ? false : true,
-		    light["brightness"].toInt(), light["temperature"].toInt()});
+		lightStatus.push_back(LightStatus{
+		    light["on"].toInt() == 0 ? false : true, light["brightness"].toInt(), light["temperature"].toInt()});
 	};
 
 	return lightStatus;
@@ -115,58 +116,84 @@ void KeyLightControlWindow::getStatusFinished(QNetworkReply* reply) {
 
 		QString jsonStatusText = reply->readAll();
 
-		qDebug() << "LightStatus: " << jsonStatusText;
-		auto lightStatus = parseStatus(jsonStatusText);
-		updateStatusUI(lightStatus);
+		std::vector<LightStatus> newStatus = parseStatus(jsonStatusText);
+		if (newStatus != _currentLightStatus) {
+			_currentLightStatus = newStatus;
+			updateStatusUI();
+		}
 
 		_statusReply = nullptr;
 	}
 }
 
-void KeyLightControlWindow::updateStatusUI(std::vector<LightStatus> lightStatus) {
-	qDeleteAll(_statusFrame->findChildren<QWidget*>("", Qt::FindDirectChildrenOnly));
+void KeyLightControlWindow::updateStatusUI() {
+	QList<QWidget*> children = _statusFrame->findChildren<QWidget*>("", Qt::FindDirectChildrenOnly);
 	QLayout* statusLayout = _statusFrame->layout();
 
-	for (LightStatus light : lightStatus) {
-		QCheckBox* checkOn = new QCheckBox();
+	for (int i = 0; i < (int)_currentLightStatus.size(); i++) {
+		LightStatus light = _currentLightStatus[i];
+
+		if (children.count() <= i) {
+			QCheckBox* checkOn = new QCheckBox();
+			checkOn->setObjectName("on");
+			QObject::connect(checkOn, &QCheckBox::stateChanged, [this, lightIndex = i](int checkState) {
+				_currentLightStatus[lightIndex].on = checkState != 0;
+				updateLightState();
+			});
+
+			QSlider* progressBrightness = new QSlider(Qt::Orientation::Horizontal);
+			progressBrightness->setObjectName("brightness");
+			progressBrightness->setMinimum(1);
+			progressBrightness->setMaximum(100);
+			progressBrightness->setFixedWidth(100);
+			progressBrightness->setTracking(false);
+			QObject::connect(progressBrightness, &QSlider::valueChanged, [this, lightIndex = i](int value) {
+				_currentLightStatus[lightIndex].brightness = value;
+				updateLightState();
+			});
+
+			QSlider* progressTemperature = new QSlider(Qt::Orientation::Horizontal);
+			progressTemperature->setObjectName("temp");
+			progressTemperature->setMinimum(143);
+			progressTemperature->setMaximum(344);
+			progressTemperature->setFixedWidth(100);
+			progressTemperature->setTracking(false);
+			QObject::connect(progressTemperature, &QSlider::valueChanged, [this, lightIndex = i](int value) {
+				_currentLightStatus[lightIndex].temp = value;
+				updateLightState();
+			});
+
+			QFrame* lightStatusFrame =
+			    applyLayout<QFrame, QHBoxLayout>({checkOn, progressBrightness, progressTemperature});
+
+			statusLayout->addWidget(lightStatusFrame);
+			children = _statusFrame->findChildren<QWidget*>("", Qt::FindDirectChildrenOnly);
+		}
+
+		assert(children.count() > i);
+
+		QCheckBox* checkOn = children[i]->findChild<QCheckBox*>("on", Qt::FindDirectChildrenOnly);
+		QSignalBlocker checkOnBlocker(checkOn);
 		checkOn->setChecked(light.on);
-		QObject::connect(checkOn, &QCheckBox::stateChanged, [this, light](int checkState) {
-			LightStatus newStatus = light;
-			newStatus.on = checkState != 0;
-			setLightState(newStatus);
-		});
 
-		QSlider* progressBrightness = new QSlider(Qt::Orientation::Horizontal);
-		progressBrightness->setMinimum(1);
-		progressBrightness->setMaximum(100);
+		QSlider* progressBrightness = children[i]->findChild<QSlider*>("brightness", Qt::FindDirectChildrenOnly);
+		QSignalBlocker progressBrightnessBlocker(progressBrightness);
 		progressBrightness->setValue(light.brightness);
-		progressBrightness->setFixedWidth(100);
-		progressBrightness->setTracking(false);
-		QObject::connect(progressBrightness, &QSlider::valueChanged, [this, light](int value) {
-			LightStatus newStatus = light;
-			newStatus.brightness = value;
-			setLightState(newStatus);
-		});
 
-		QSlider* progressTemperature = new QSlider(Qt::Orientation::Horizontal);
-		progressTemperature->setMinimum(143);
-		progressTemperature->setMaximum(344);
+		QSlider* progressTemperature = children[i]->findChild<QSlider*>("temp", Qt::FindDirectChildrenOnly);
+		QSignalBlocker progressTemperatureBlocker(progressTemperature);
 		progressTemperature->setValue(light.temp);
-		progressTemperature->setFixedWidth(100);
-		progressTemperature->setTracking(false);
-		QObject::connect(progressTemperature, &QSlider::valueChanged, [this, light](int value) {
-			LightStatus newStatus = light;
-			newStatus.temp = value;
-			setLightState(newStatus);
-		});
-
-		QFrame* lightStatusFrame = applyLayout<QFrame, QHBoxLayout>({checkOn, progressBrightness, progressTemperature});
-
-		statusLayout->addWidget(lightStatusFrame);
 	}
 }
 
-void KeyLightControlWindow::setLightState(LightStatus status) {
+void KeyLightControlWindow::updateLightState() {
+	if (_currentLightStatus.empty()) {
+		return;
+	}
+
+	// TODO: I cheated and only am supporting setting one light right now
+	const LightStatus& status = _currentLightStatus.at(0);
+
 	std::string payload = R"RAW({
       "lights": [
         {
@@ -184,8 +211,9 @@ void KeyLightControlWindow::setLightState(LightStatus status) {
 
 	std::string url = "http://" + _hostName + ":" + _port + "/elgato/lights";
 
-	qDebug() << payload.c_str();
+	_networkManager->put(QNetworkRequest(QUrl(url.c_str())), QByteArray(payload.c_str(), payload.size()));
 
-	_statusReply =
-	    _networkManager->put(QNetworkRequest(QUrl(url.c_str())), QByteArray(payload.c_str(), payload.size()));
+	// reset the timer
+	_timer->stop();
+	_timer->start();
 }
