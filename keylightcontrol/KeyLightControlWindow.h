@@ -4,6 +4,7 @@
 #include <QtGui>
 
 #include <memory>
+#include <string>
 
 class QFrame;
 class QNetworkAccessManager;
@@ -14,16 +15,15 @@ class KeyLightControlWindow : public QWidget {
 	Q_OBJECT
 
 public:
-	KeyLightControlWindow();
+	KeyLightControlWindow(std::string hostName, std::string port);
 	~KeyLightControlWindow();
 
 private slots:
-	void turnOn();
-	void turnOff();
 	void getStatus();
 
 private:
 	struct LightStatus {
+		int index;
 		bool on;
 		int brightness;
 		int temp;
@@ -32,7 +32,10 @@ private:
 	void getStatusFinished(QNetworkReply* reply);
 	std::vector<LightStatus> parseStatus(const QString& jsonStatusText);
 	void updateStatusUI(std::vector<LightStatus> lightStatus);
+	void setLightState(LightStatus status);
 
+	std::string _hostName;
+	std::string _port;
 	std::unique_ptr<QNetworkAccessManager> _networkManager;
 	QNetworkReply* _statusReply = nullptr;
 	QFrame* _statusFrame;
