@@ -3,6 +3,7 @@
 #include <QMainWindow>
 #include <QtGui>
 
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -39,10 +40,13 @@ private:
 	std::string _hostName;
 	std::string _port;
 
-	QTimer* _timer;
+	QTimer* _refreshTimer;
+	QTimer* _sendUpdateTimer;
+
 	std::unique_ptr<QNetworkAccessManager> _networkManager;
 	QNetworkReply* _statusReply = nullptr;
 	QFrame* _statusFrame;
 
 	std::vector<LightStatus> _currentLightStatus;
+	std::chrono::time_point<std::chrono::system_clock> _lastUpdateSent;
 };

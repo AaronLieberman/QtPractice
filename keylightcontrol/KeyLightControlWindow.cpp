@@ -13,8 +13,6 @@
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 
-#include <string>
-
 #include "KeyLightControlWindow.h"
 
 namespace {
@@ -60,9 +58,12 @@ KeyLightControlWindow::KeyLightControlWindow(std::string hostName, std::string p
 
 	applyLayout<QWidget, QVBoxLayout>(this, {statusGroupFrame});
 
-	_timer = new QTimer(this);
-	connect(_timer, SIGNAL(timeout()), this, SLOT(getStatus()));
-	_timer->start(1000);
+	_refreshTimer = new QTimer(this);
+	connect(_refreshTimer, SIGNAL(timeout()), this, SLOT(getStatus()));
+	_refreshTimer->start(1000);
+
+	_sendUpdateTimer = new QTimer(this);
+	connect(_sendUpdateTimer, &QTimer::timeout, [this] { updateLightState(); });
 
 	QObject::connect(_networkManager.get(), &QNetworkAccessManager::finished, this,
 	    [this](QNetworkReply* reply) { getStatusFinished(reply); });
@@ -146,7 +147,6 @@ void KeyLightControlWindow::updateStatusUI() {
 			progressBrightness->setMinimum(1);
 			progressBrightness->setMaximum(100);
 			progressBrightness->setFixedWidth(100);
-			progressBrightness->setTracking(false);
 			QObject::connect(progressBrightness, &QSlider::valueChanged, [this, lightIndex = i](int value) {
 				_currentLightStatus[lightIndex].brightness = value;
 				updateLightState();
@@ -157,7 +157,6 @@ void KeyLightControlWindow::updateStatusUI() {
 			progressTemperature->setMinimum(143);
 			progressTemperature->setMaximum(344);
 			progressTemperature->setFixedWidth(100);
-			progressTemperature->setTracking(false);
 			QObject::connect(progressTemperature, &QSlider::valueChanged, [this, lightIndex = i](int value) {
 				_currentLightStatus[lightIndex].temp = value;
 				updateLightState();
@@ -191,6 +190,15 @@ void KeyLightControlWindow::updateLightState() {
 		return;
 	}
 
+	std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
+	if (std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastUpdateSent).count() < 500) {
+		_sendUpdateTimer->start();
+		return;
+	}
+
+	_lastUpdateSent = now;
+	_sendUpdateTimer->stop();
+
 	// TODO: I cheated and only am supporting setting one light right now
 	const LightStatus& status = _currentLightStatus.at(0);
 
@@ -214,6 +222,6 @@ void KeyLightControlWindow::updateLightState() {
 	_networkManager->put(QNetworkRequest(QUrl(url.c_str())), QByteArray(payload.c_str(), payload.size()));
 
 	// reset the timer
-	_timer->stop();
-	_timer->start();
+	_refreshTimer->stop();
+	_refreshTimer->start();
 }
