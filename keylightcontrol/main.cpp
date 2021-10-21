@@ -1,26 +1,14 @@
 #include <QApplication>
-#include <QPushButton>
-#include <QTextEdit>
-#include <QVBoxLayout>
-#include <QWidget>
-#include <QtGui>
+
+#include "KeyLightControlWindow.h"
 
 int main(int argv, char** args) {
 	QApplication app(argv, args);
 
-	QTextEdit* textEdit = new QTextEdit();
-	QPushButton* quitButton = new QPushButton("&Quit");
+	KeyLightControlWindow mainWindow;
+	QObject::connect(&mainWindow, SIGNAL(quit()), &app, SLOT(quit()));
 
-	QObject::connect(quitButton, SIGNAL(clicked()), &app, SLOT(quit()));
-
-	QVBoxLayout* layout = new QVBoxLayout();
-	layout->addWidget(textEdit);
-	layout->addWidget(quitButton);
-
-	QWidget window;
-	window.setLayout(layout);
-
-	window.show();
+	mainWindow.show();
 
 	return app.exec();
 }
