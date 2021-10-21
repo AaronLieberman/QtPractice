@@ -1,3 +1,11 @@
 {
 	"clang-format.executable": "/bin/clang-format",
+	"files.exclude": {
+		"**/.qmake.stash": true,
+		"**/*.o": true,
+		"**/Makefile": true,
+		"**/moc_predefs.h": true,
+		"keylightcontrol/keylightcontrol": true,
+		"keylightcontrol/moc_KeyLightControlWindow.cpp": true,
+	}
 }
