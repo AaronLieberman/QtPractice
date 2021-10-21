@@ -9,9 +9,6 @@ class KeyLightControlWindow : public QWidget {
 public:
 	KeyLightControlWindow();
 
-signals:
-	void quit();
-
 private slots:
 	void turnOn();
 	void turnOff();
