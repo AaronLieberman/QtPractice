@@ -1,5 +1,20 @@
 {
 	"clang-format.executable": "/bin/clang-format",
+	"files.associations": {
+		"*.ino": "cpp",
+		".clang-format": "yaml",
+		"bit": "cpp",
+		"*.tcc": "cpp",
+		"future": "cpp",
+		"optional": "cpp",
+		"array": "cpp",
+		"memory": "cpp",
+		"istream": "cpp",
+		"functional": "cpp",
+		"tuple": "cpp",
+		"utility": "cpp",
+		"variant": "cpp"
+	},
 	"files.exclude": {
 		"**/.qmake.stash": true,
 		"**/*.o": true,
@@ -7,5 +22,5 @@
 		"**/moc_predefs.h": true,
 		"keylightcontrol/keylightcontrol": true,
 		"keylightcontrol/moc_KeyLightControlWindow.cpp": true,
-	}
+	},
 }
